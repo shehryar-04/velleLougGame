@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Scrolling Path Game - Images for Player & Obstacles</title>
+<title>Scrolling Path Game - 4 Lanes with Swipe</title>
 <style>
 body {
   margin: 0;
@@ -19,6 +19,7 @@ canvas {
   border: 2px solid white;
   background: #333;
   display: none;
+  touch-action: none; /* prevent default touch scrolling */
 }
 .overlay {
   position: absolute;
@@ -66,13 +67,21 @@ const gameOverText = document.getElementById("gameOverText");
 const levelSelectDiv = document.getElementById("levelSelect");
 const levelButtonsDiv = document.getElementById("levelButtons");
 
+// Lane settings
+const LANE_COUNT = 4;
+const LANE_WIDTH = (canvas.width - 40) / LANE_COUNT; // 20px margin on both sides
+const LANES = [];
+for(let i=0; i<LANE_COUNT; i++){
+  LANES.push(20 + i*LANE_WIDTH + LANE_WIDTH/2); // center of each lane
+}
+
 // Player image and size
 const PLAYER_WIDTH = 40;
-const PLAYER_HEIGHT = 80;
+const PLAYER_HEIGHT = 90;
 const playerImg = new Image();
 playerImg.src = './car2.png'; // <-- Your player image path
 
-const player = { x:0, y:0, width:PLAYER_WIDTH, height:PLAYER_HEIGHT, speed:6 };
+const player = { lane:1, x:0, y:0, width:PLAYER_WIDTH, height:PLAYER_HEIGHT, speed:6 };
 
 // Game state
 let bgSpeed, lineOffset, obstacles, frame, gameOver;
@@ -112,9 +121,36 @@ for(let i=1;i<=15;i++){
 }
 
 // Controls
-document.addEventListener("keydown", e => { if(e.key==="ArrowLeft") left=true; if(e.key==="ArrowRight") right=true; });
-document.addEventListener("keyup", e => { if(e.key==="ArrowLeft") left=false; if(e.key==="ArrowRight") right=false; });
+document.addEventListener("keydown", e => { 
+  if(e.key==="ArrowLeft") left=true; 
+  if(e.key==="ArrowRight") right=true; 
+});
+document.addEventListener("keyup", e => { 
+  if(e.key==="ArrowLeft") left=false; 
+  if(e.key==="ArrowRight") right=false; 
+});
 
+// Swipe detection
+let touchStartX = null;
+canvas.addEventListener("touchstart", (e)=>{
+  touchStartX = e.touches[0].clientX;
+});
+
+canvas.addEventListener("touchend", (e)=>{
+  if(touchStartX === null) return;
+  const touchEndX = e.changedTouches[0].clientX;
+  const diff = touchEndX - touchStartX;
+
+  const swipeThreshold = 30; // min px to count as swipe
+  if(diff > swipeThreshold){
+    right = true;
+  } else if(diff < -swipeThreshold){
+    left = true;
+  }
+  touchStartX = null;
+});
+
+// Level functions
 function startLevel(lvl){
   level = lvl;
   const data = levelData[lvl-1];
@@ -130,7 +166,8 @@ function startLevel(lvl){
   levelDuration = 30; // 30s per level
   levelTime = 0;
 
-  player.x = canvas.width/2 - player.width/2;
+  player.lane = 1;
+  player.x = LANES[player.lane] - player.width/2;
   player.y = canvas.height-100;
 
   startTime = Date.now();
@@ -150,9 +187,10 @@ function resetGame(){
   startLevel(level);
 }
 
-// Spawn obstacles
+// Spawn obstacles in lanes
 function spawnObstacle() {
-  const x = 20 + Math.random()*(canvas.width - 40 - OBSTACLE_WIDTH);
+  const lane = Math.floor(Math.random() * LANE_COUNT);
+  const x = LANES[lane] - OBSTACLE_WIDTH/2;
   obstacles.push({x, y:-OBSTACLE_HEIGHT, width: OBSTACLE_WIDTH, height: OBSTACLE_HEIGHT});
 }
 
@@ -174,9 +212,10 @@ function checkCollision(a,b){
 function update() {
   if(gameOver) return;
 
-  if(left) player.x -= player.speed;
-  if(right) player.x += player.speed;
-  player.x = Math.max(20, Math.min(canvas.width - player.width - 20, player.x));
+  // Lane movement
+  if(left) { player.lane = Math.max(0, player.lane-1); left=false; }
+  if(right) { player.lane = Math.min(LANE_COUNT-1, player.lane+1); right=false; }
+  player.x = LANES[player.lane] - player.width/2;
 
   lineOffset += bgSpeed;
   if(lineOffset>40) lineOffset=0;
@@ -210,18 +249,23 @@ function drawBackground(){
   ctx.fillStyle="#555";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
+  // Draw road borders
   ctx.fillStyle="#222";
   ctx.fillRect(0,0,20,canvas.height);
   ctx.fillRect(canvas.width-20,0,20,canvas.height);
 
+  // Draw lane dividers
   ctx.strokeStyle="#eee";
   ctx.lineWidth=4;
   ctx.setLineDash([20,20]);
   ctx.lineDashOffset=-lineOffset;
-  ctx.beginPath();
-  ctx.moveTo(canvas.width/2,0);
-  ctx.lineTo(canvas.width/2,canvas.height);
-  ctx.stroke();
+  for(let i=1; i<LANE_COUNT; i++){
+    const x = 20 + i*LANE_WIDTH;
+    ctx.beginPath();
+    ctx.moveTo(x,0);
+    ctx.lineTo(x,canvas.height);
+    ctx.stroke();
+  }
   ctx.setLineDash([]);
 }
 
