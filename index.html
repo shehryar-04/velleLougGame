@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Scrolling Path Game - Taller Obstacles</title>
+<style>
+body {
+  margin: 0;
+  background: #111;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  font-family: Arial, sans-serif;
+  position: relative;
+  flex-direction: column;
+}
+canvas {
+  border: 2px solid white;
+  background: #333;
+  display: none;
+}
+.overlay {
+  position: absolute;
+  text-align: center;
+  color: white;
+  display: none;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+button {
+  padding: 10px 20px;
+  font-size: 16px;
+  cursor: pointer;
+  margin-top: 10px;
+  margin-right: 5px;
+}
+#levelSelect {
+  color: white;
+}
+</style>
+</head>
+<body>
+
+<div id="levelSelect">
+  <h1>Select Level (1–15)</h1>
+  <div id="levelButtons"></div>
+</div>
+
+<canvas id="game" width="400" height="600"></canvas>
+
+<div class="overlay" id="gameOverScreen">
+  <h1 id="gameOverText">Game Over</h1>
+  <p id="finalTime"></p>
+  <button onclick="showLevelSelect()">Choose Level</button>
+  <button onclick="resetGame()">Try Again</button>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const gameOverScreen = document.getElementById("gameOverScreen");
+const finalTimeText = document.getElementById("finalTime");
+const gameOverText = document.getElementById("gameOverText");
+const levelSelectDiv = document.getElementById("levelSelect");
+const levelButtonsDiv = document.getElementById("levelButtons");
+
+// Player
+const player = { x:0, y:0, size:30, speed:6 };
+
+// Game state
+let bgSpeed, lineOffset, obstacles, frame, gameOver;
+
+// Timer
+let startTime, levelTime, levelDuration;
+
+// Level
+let level = 1;
+
+// Obstacle
+const OBSTACLE_WIDTH = 40;
+const OBSTACLE_HEIGHT = 80; // Taller than wide
+let obstacleSpeed, spawnRate;
+
+// Controls
+let left=false, right=false;
+
+// Load obstacle image
+const obstacleImg = new Image();
+obstacleImg.src = './car2.png'; // Replace with your image
+
+// Mock level data for 15 levels
+const levelData = [];
+for(let i=1;i<=15;i++){
+  levelData.push({
+    bgSpeed: 4 + i*0.5,
+    obstacleSpeed: 2 + i*0.3,
+    spawnRate: Math.max(20, 90 - i*5)
+  });
+}
+
+// Add level selection buttons
+for(let i=1;i<=15;i++){
+  const btn = document.createElement("button");
+  btn.textContent = i;
+  btn.onclick = ()=>startLevel(i);
+  levelButtonsDiv.appendChild(btn);
+}
+
+// Controls
+document.addEventListener("keydown", e => { if(e.key==="ArrowLeft") left=true; if(e.key==="ArrowRight") right=true; });
+document.addEventListener("keyup", e => { if(e.key==="ArrowLeft") left=false; if(e.key==="ArrowRight") right=false; });
+
+function startLevel(lvl){
+  level = lvl;
+  const data = levelData[lvl-1];
+  bgSpeed = data.bgSpeed;
+  obstacleSpeed = data.obstacleSpeed;
+  spawnRate = data.spawnRate;
+
+  lineOffset = 0;
+  obstacles = [];
+  frame = 0;
+  gameOver = false;
+
+  levelDuration = 30; // 30s per level
+  levelTime = 0;
+
+  player.x = canvas.width/2 - player.size/2;
+  player.y = canvas.height-100;
+
+  startTime = Date.now();
+
+  levelSelectDiv.style.display = "none";
+  canvas.style.display = "block";
+  gameOverScreen.style.display="none";
+}
+
+function showLevelSelect(){
+  canvas.style.display="none";
+  gameOverScreen.style.display="none";
+  levelSelectDiv.style.display="block";
+}
+
+function resetGame(){
+  startLevel(level);
+}
+
+// Spawn taller obstacles
+function spawnObstacle() {
+  const x = 20 + Math.random()*(canvas.width - 40 - OBSTACLE_WIDTH);
+  obstacles.push({x, y:-OBSTACLE_HEIGHT, width: OBSTACLE_WIDTH, height: OBSTACLE_HEIGHT});
+}
+
+function updateObstacles() {
+  for(let i=obstacles.length-1; i>=0; i--){
+    obstacles[i].y += obstacleSpeed;
+    if(obstacles[i].y > canvas.height) obstacles.splice(i,1);
+  }
+}
+
+// Check collision for rectangles
+function checkCollision(a,b){
+  return a.x < b.x + b.width &&
+         a.x + a.size > b.x &&
+         a.y < b.y + b.height &&
+         a.y + a.size > b.y;
+}
+
+function update() {
+  if(gameOver) return;
+
+  if(left) player.x -= player.speed;
+  if(right) player.x += player.speed;
+  player.x = Math.max(20, Math.min(canvas.width - player.size - 20, player.x));
+
+  lineOffset += bgSpeed;
+  if(lineOffset>40) lineOffset=0;
+
+  frame++;
+  if(frame % Math.floor(spawnRate) === 0) spawnObstacle();
+  updateObstacles();
+
+  // Collision
+  for(const obs of obstacles){
+    if(checkCollision(player, obs)){
+      gameOver=true;
+      const elapsedTime = ((Date.now()-startTime)/1000).toFixed(2);
+      finalTimeText.textContent=`Time Survived: ${elapsedTime}s`;
+      gameOverScreen.style.display="block";
+      return;
+    }
+  }
+
+  // Level timer
+  levelTime = (Date.now()-startTime)/1000;
+  if(levelTime >= levelDuration){
+    gameOver = true;
+    gameOverText.textContent = "Level Completed!";
+    finalTimeText.textContent = `You completed level ${level}!`;
+    gameOverScreen.style.display="block";
+  }
+}
+
+function drawBackground(){
+  ctx.fillStyle="#555";
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  ctx.fillStyle="#222";
+  ctx.fillRect(0,0,20,canvas.height);
+  ctx.fillRect(canvas.width-20,0,20,canvas.height);
+
+  ctx.strokeStyle="#eee";
+  ctx.lineWidth=4;
+  ctx.setLineDash([20,20]);
+  ctx.lineDashOffset=-lineOffset;
+  ctx.beginPath();
+  ctx.moveTo(canvas.width/2,0);
+  ctx.lineTo(canvas.width/2,canvas.height);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawObstacles(){
+  for(const obs of obstacles){
+    ctx.drawImage(obstacleImg, obs.x, obs.y, obs.width, obs.height);
+  }
+}
+
+function drawPlayer(){
+  ctx.fillStyle="#00ffcc";
+  ctx.fillRect(player.x,player.y,player.size,player.size);
+}
+
+function drawHUD(){
+  ctx.fillStyle="white";
+  ctx.font="20px Arial";
+  ctx.fillText(`Level: ${level}`,10,30);
+
+  if(!gameOver){
+    const remaining = (levelDuration - levelTime).toFixed(2);
+    ctx.fillText(`Time: ${remaining}s`, canvas.width-120,30);
+  }
+}
+
+function gameLoop(){
+  if(canvas.style.display === "block"){
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    drawBackground();
+    update();
+    drawObstacles();
+    drawPlayer();
+    drawHUD();
+  }
+  requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,68 @@
+body {
+  background: #111;
+  color: #eee;
+  font-family: monospace;
+  text-align: center;
+}
+
+h1 {
+  margin-bottom: 5px;
+}
+
+.hint {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+#game {
+  position: relative;
+  width: 360px;
+  height: 500px;
+  margin: 20px auto;
+  background: linear-gradient(#222, #000);
+  overflow: hidden;
+  border: 3px solid #444;
+}
+
+.lane {
+  position: absolute;
+  width: 120px;
+  height: 100%;
+}
+
+#player {
+  position: absolute;
+  bottom: 60px;
+  left: 120px;
+  width: 40px;
+  height: 40px;
+  background: #4caf50;
+  border-radius: 5px;
+}
+
+#chaser {
+  position: absolute;
+  bottom: 10px;
+  left: 120px;
+  width: 40px;
+  height: 40px;
+  background: #e53935;
+  border-radius: 5px;
+}
+
+.obstacle {
+  position: absolute;
+  top: -50px;
+  width: 40px;
+  height: 40px;
+  background: #ff9800;
+  border-radius: 5px;
+}
+
+.hidden {
+  display: none;
+}
+
+#gameOver {
+  margin-top: 20px;
+}
