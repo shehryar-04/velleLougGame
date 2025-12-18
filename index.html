@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Scrolling Path Game - 4 Lanes Responsive</title>
+<title>Scrolling Path Game - Fixed Lanes</title>
 <style>
 body {
   margin: 0;
@@ -12,7 +12,6 @@ body {
   align-items: center;
   height: 100vh;
   font-family: Arial, sans-serif;
-  position: relative;
   flex-direction: column;
 }
 
@@ -20,11 +19,11 @@ canvas {
   border: 2px solid white;
   background: #333;
   display: none;
-  touch-action: none; /* prevent scrolling */
-  width: 90vw;       /* responsive width */
-  max-width: 400px;  /* maximum width for desktop */
-  height: calc(90vw * 1.5); /* maintain 2:3 aspect ratio */
-  max-height: 600px; /* maximum height for desktop */
+  touch-action: none;
+  width: 90vw;
+  max-width: 400px;
+  height: calc(90vw * 1.5);
+  max-height: 600px;
 }
 
 .overlay {
@@ -45,9 +44,7 @@ button {
   margin-right: 5px;
 }
 
-#levelSelect {
-  color: white;
-}
+#levelSelect { color: white; }
 </style>
 </head>
 <body>
@@ -66,6 +63,9 @@ button {
   <button onclick="resetGame()">Try Again</button>
 </div>
 
+<!-- Crash sound -->
+<audio id="crashSound" src="./laude-lag-gaye.mp3" preload="auto"></audio>
+
 <script>
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
@@ -79,43 +79,39 @@ const levelButtonsDiv = document.getElementById("levelButtons");
 const LANE_COUNT = 4;
 let LANES = [];
 
-// Player image and size
-const PLAYER_WIDTH = 50;
+// Player
+const PLAYER_WIDTH = 40;
 const PLAYER_HEIGHT = 80;
 const playerImg = new Image();
-playerImg.src = './car2.png'; // <-- replace with your player image path
-const player = { lane:1, x:0, y:0, width:PLAYER_WIDTH, height:PLAYER_HEIGHT, speed:6 };
+playerImg.src = 'car2.png'; // Replace with your player image
+const player = { lane:1, x:0, y:0, width:PLAYER_WIDTH, height:PLAYER_HEIGHT };
 
-// Game state
-let bgSpeed, lineOffset, obstacles, frame, gameOver;
-
-// Timer
-let startTime, levelTime, levelDuration;
-
-// Level
-let level = 1;
-
-// Obstacle image and size
+// Obstacles
 const OBSTACLE_WIDTH = 40;
 const OBSTACLE_HEIGHT = 80;
 const obstacleImg = new Image();
-obstacleImg.src = './car2.png'; // <-- replace with your obstacle image path
-let obstacleSpeed, spawnRate;
+obstacleImg.src = 'car2.png'; // Replace with your obstacle image
+let obstacles = [];
+
+// Game state
+let bgSpeed, lineOffset=0, frame=0, gameOver=false;
+let startTime, levelTime=0, levelDuration=30;
+let level = 1, obstacleSpeed, spawnRate;
 
 // Controls
 let left=false, right=false;
 
-// Level data
+// Level data - faster upper levels
 const levelData = [];
 for(let i=1;i<=15;i++){
   levelData.push({
-    bgSpeed: 4 + i*0.5,
-    obstacleSpeed: 2 + i*0.3,
-    spawnRate: Math.max(20, 90 - i*5)
+    bgSpeed: 4 + i*2.0,
+    obstacleSpeed: 2 + i*2.0,
+    spawnRate: Math.max(15, 40 - i*2)
   });
 }
 
-// Level selection buttons
+// Level buttons
 for(let i=1;i<=15;i++){
   const btn = document.createElement("button");
   btn.textContent = i;
@@ -123,7 +119,7 @@ for(let i=1;i<=15;i++){
   levelButtonsDiv.appendChild(btn);
 }
 
-// Keyboard controls
+// Keyboard
 document.addEventListener("keydown", e => { 
   if(e.key==="ArrowLeft") left=true; 
   if(e.key==="ArrowRight") right=true; 
@@ -133,36 +129,28 @@ document.addEventListener("keyup", e => {
   if(e.key==="ArrowRight") right=false; 
 });
 
-// Swipe controls
+// Touch swipe
 let touchStartX = null;
-canvas.addEventListener("touchstart", e => {
-  touchStartX = e.touches[0].clientX;
-});
+canvas.addEventListener("touchstart", e => { touchStartX = e.touches[0].clientX; });
 canvas.addEventListener("touchend", e => {
   if(touchStartX === null) return;
-  const touchEndX = e.changedTouches[0].clientX;
-  const diff = touchEndX - touchStartX;
-  const swipeThreshold = 30;
-  if(diff > swipeThreshold) right = true;
-  else if(diff < -swipeThreshold) left = true;
+  const diff = e.changedTouches[0].clientX - touchStartX;
+  if(diff > 30) right = true;
+  else if(diff < -30) left = true;
   touchStartX = null;
 });
 
-// Update lanes based on canvas size
+// Calculate lane centers
 function updateLaneCenters() {
-  const actualWidth = canvas.clientWidth;
-  const margin = 20 * (actualWidth / 400); 
-  const roadWidth = actualWidth - 2 * margin;
+  const margin = 20;
+  const roadWidth = canvas.width - 2 * margin;
   const laneWidth = roadWidth / LANE_COUNT;
   LANES = [];
   for(let i=0;i<LANE_COUNT;i++){
     LANES.push(margin + i*laneWidth + laneWidth/2);
   }
 }
-
-// Call initially and on resize
 updateLaneCenters();
-window.addEventListener('resize', updateLaneCenters);
 
 // Start level
 function startLevel(lvl){
@@ -172,22 +160,15 @@ function startLevel(lvl){
   obstacleSpeed = data.obstacleSpeed;
   spawnRate = data.spawnRate;
 
-  lineOffset = 0;
-  obstacles = [];
-  frame = 0;
-  gameOver = false;
-
-  levelDuration = 30;
-  levelTime = 0;
+  lineOffset=0; frame=0; gameOver=false; obstacles=[];
+  levelTime=0; startTime = Date.now();
 
   player.lane = 1;
   player.x = LANES[player.lane] - player.width/2;
-  player.y = canvas.height-100;
+  player.y = canvas.height - 100;
 
-  startTime = Date.now();
-
-  levelSelectDiv.style.display = "none";
-  canvas.style.display = "block";
+  levelSelectDiv.style.display="none";
+  canvas.style.display="block";
   gameOverScreen.style.display="none";
 }
 
@@ -197,38 +178,49 @@ function showLevelSelect(){
   levelSelectDiv.style.display="block";
 }
 
-function resetGame(){
-  startLevel(level);
+function resetGame(){ 
+    const crashAudio = document.getElementById("crashSound");
+  crashAudio.pause();
+  crashAudio.currentTime = 0;
+    startLevel(level); 
 }
 
-// Spawn obstacles in lanes
+// Spawn obstacle - always leave at least one free lane
 function spawnObstacle() {
-  const lane = Math.floor(Math.random() * LANE_COUNT);
-  const x = LANES[lane] - OBSTACLE_WIDTH/2;
-  obstacles.push({x, y:-OBSTACLE_HEIGHT, width: OBSTACLE_WIDTH, height: OBSTACLE_HEIGHT});
+  const occupiedLanes = obstacles
+    .filter(o => o.y < OBSTACLE_HEIGHT*2)
+    .map(o => LANES.findIndex(laneX => Math.abs(o.x + OBSTACLE_WIDTH/2 - laneX) < 1));
+
+  const freeLanes = [];
+  for(let i=0;i<LANE_COUNT;i++){
+    if(!occupiedLanes.includes(i)) freeLanes.push(i);
+  }
+  if(freeLanes.length === 0) return;
+
+  const lane = freeLanes[Math.floor(Math.random() * freeLanes.length)];
+  obstacles.push({x: LANES[lane]-OBSTACLE_WIDTH/2, y:-OBSTACLE_HEIGHT, width: OBSTACLE_WIDTH, height: OBSTACLE_HEIGHT});
 }
 
+// Update obstacles
 function updateObstacles() {
-  for(let i=obstacles.length-1; i>=0; i--){
+  for(let i=obstacles.length-1;i>=0;i--){
     obstacles[i].y += obstacleSpeed;
-    if(obstacles[i].y > canvas.height) obstacles.splice(i,1);
+    if(obstacles[i].y>canvas.height) obstacles.splice(i,1);
   }
 }
 
-// Collision detection
+// Collision
 function checkCollision(a,b){
-  return a.x < b.x + b.width &&
-         a.x + a.width > b.x &&
-         a.y < b.y + b.height &&
-         a.y + a.height > b.y;
+  return a.x < b.x + b.width && a.x + a.width > b.x &&
+         a.y < b.y + b.height && a.y + a.height > b.y;
 }
 
 // Game update
 function update() {
   if(gameOver) return;
 
-  if(left) { player.lane = Math.max(0, player.lane-1); left=false; }
-  if(right) { player.lane = Math.min(LANE_COUNT-1, player.lane+1); right=false; }
+  if(left){ player.lane = Math.max(0, player.lane-1); left=false; }
+  if(right){ player.lane = Math.min(LANE_COUNT-1, player.lane+1); right=false; }
   player.x = LANES[player.lane] - player.width/2;
 
   lineOffset += bgSpeed;
@@ -240,10 +232,15 @@ function update() {
 
   for(const obs of obstacles){
     if(checkCollision(player, obs)){
-      gameOver=true;
-      const elapsedTime = ((Date.now()-startTime)/1000).toFixed(2);
-      finalTimeText.textContent=`Time Survived: ${elapsedTime}s`;
-      gameOverScreen.style.display="block";
+      gameOver = true;
+
+      // Play crash sound
+      const crashAudio = document.getElementById("crashSound");
+      crashAudio.currentTime = 0;
+      crashAudio.play();
+
+      finalTimeText.textContent = `Time Survived: ${((Date.now()-startTime)/1000).toFixed(2)}s`;
+      gameOverScreen.style.display = "block";
       return;
     }
   }
@@ -251,13 +248,13 @@ function update() {
   levelTime = (Date.now()-startTime)/1000;
   if(levelTime >= levelDuration){
     gameOver = true;
-    gameOverText.textContent = "Level Completed!";
+    gameOverText.textContent="Level Completed!";
     finalTimeText.textContent = `You completed level ${level}!`;
     gameOverScreen.style.display="block";
   }
 }
 
-// Draw functions
+// Draw
 function drawBackground(){
   ctx.fillStyle="#555";
   ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -270,8 +267,10 @@ function drawBackground(){
   ctx.lineWidth=4;
   ctx.setLineDash([20,20]);
   ctx.lineDashOffset=-lineOffset;
-  for(let i=1; i<LANE_COUNT; i++){
-    const x = 20 + i*((canvas.width-40)/LANE_COUNT);
+
+  const roadWidth = canvas.width - 40;
+  for(let i=1;i<LANE_COUNT;i++){
+    const x = 20 + i*(roadWidth/LANE_COUNT);
     ctx.beginPath();
     ctx.moveTo(x,0);
     ctx.lineTo(x,canvas.height);
@@ -280,24 +279,15 @@ function drawBackground(){
   ctx.setLineDash([]);
 }
 
-function drawObstacles(){
-  for(const obs of obstacles){
-    ctx.drawImage(obstacleImg, obs.x, obs.y, obs.width, obs.height);
-  }
-}
-
-function drawPlayer(){
-  ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
-}
+function drawObstacles(){ obstacles.forEach(o => ctx.drawImage(obstacleImg, o.x, o.y, o.width, o.height)); }
+function drawPlayer(){ ctx.drawImage(playerImg, player.x, player.y, player.width, player.height); }
 
 function drawHUD(){
   ctx.fillStyle="white";
   ctx.font="20px Arial";
   ctx.fillText(`Level: ${level}`,10,30);
-
   if(!gameOver){
-    const remaining = (levelDuration - levelTime).toFixed(2);
-    ctx.fillText(`Time: ${remaining}s`, canvas.width-120,30);
+    ctx.fillText(`Time: ${(levelDuration-levelTime).toFixed(2)}s`, canvas.width-120,30);
   }
 }
 
@@ -316,6 +306,5 @@ function gameLoop(){
 
 gameLoop();
 </script>
-
 </body>
 </html>
