@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Scrolling Path Game - 4 Lanes with Swipe</title>
+<title>Scrolling Path Game - 4 Lanes Responsive</title>
 <style>
 body {
   margin: 0;
@@ -15,12 +15,18 @@ body {
   position: relative;
   flex-direction: column;
 }
+
 canvas {
   border: 2px solid white;
   background: #333;
   display: none;
-  touch-action: none; /* prevent default touch scrolling */
+  touch-action: none; /* prevent scrolling */
+  width: 90vw;       /* responsive width */
+  max-width: 400px;  /* maximum width for desktop */
+  height: calc(90vw * 1.5); /* maintain 2:3 aspect ratio */
+  max-height: 600px; /* maximum height for desktop */
 }
+
 .overlay {
   position: absolute;
   text-align: center;
@@ -30,6 +36,7 @@ canvas {
   left: 50%;
   transform: translate(-50%, -50%);
 }
+
 button {
   padding: 10px 20px;
   font-size: 16px;
@@ -37,6 +44,7 @@ button {
   margin-top: 10px;
   margin-right: 5px;
 }
+
 #levelSelect {
   color: white;
 }
@@ -69,18 +77,13 @@ const levelButtonsDiv = document.getElementById("levelButtons");
 
 // Lane settings
 const LANE_COUNT = 4;
-const LANE_WIDTH = (canvas.width - 40) / LANE_COUNT; // 20px margin on both sides
-const LANES = [];
-for(let i=0; i<LANE_COUNT; i++){
-  LANES.push(20 + i*LANE_WIDTH + LANE_WIDTH/2); // center of each lane
-}
+let LANES = [];
 
 // Player image and size
-const PLAYER_WIDTH = 40;
-const PLAYER_HEIGHT = 90;
+const PLAYER_WIDTH = 50;
+const PLAYER_HEIGHT = 80;
 const playerImg = new Image();
-playerImg.src = './car2.png'; // <-- Your player image path
-
+playerImg.src = './car2.png'; // <-- replace with your player image path
 const player = { lane:1, x:0, y:0, width:PLAYER_WIDTH, height:PLAYER_HEIGHT, speed:6 };
 
 // Game state
@@ -96,13 +99,13 @@ let level = 1;
 const OBSTACLE_WIDTH = 40;
 const OBSTACLE_HEIGHT = 80;
 const obstacleImg = new Image();
-obstacleImg.src = './car2.png'; // <-- Your obstacle image path
+obstacleImg.src = './car2.png'; // <-- replace with your obstacle image path
 let obstacleSpeed, spawnRate;
 
 // Controls
 let left=false, right=false;
 
-// Mock level data for 15 levels
+// Level data
 const levelData = [];
 for(let i=1;i<=15;i++){
   levelData.push({
@@ -112,7 +115,7 @@ for(let i=1;i<=15;i++){
   });
 }
 
-// Add level selection buttons
+// Level selection buttons
 for(let i=1;i<=15;i++){
   const btn = document.createElement("button");
   btn.textContent = i;
@@ -120,7 +123,7 @@ for(let i=1;i<=15;i++){
   levelButtonsDiv.appendChild(btn);
 }
 
-// Controls
+// Keyboard controls
 document.addEventListener("keydown", e => { 
   if(e.key==="ArrowLeft") left=true; 
   if(e.key==="ArrowRight") right=true; 
@@ -130,27 +133,38 @@ document.addEventListener("keyup", e => {
   if(e.key==="ArrowRight") right=false; 
 });
 
-// Swipe detection
+// Swipe controls
 let touchStartX = null;
-canvas.addEventListener("touchstart", (e)=>{
+canvas.addEventListener("touchstart", e => {
   touchStartX = e.touches[0].clientX;
 });
-
-canvas.addEventListener("touchend", (e)=>{
+canvas.addEventListener("touchend", e => {
   if(touchStartX === null) return;
   const touchEndX = e.changedTouches[0].clientX;
   const diff = touchEndX - touchStartX;
-
-  const swipeThreshold = 30; // min px to count as swipe
-  if(diff > swipeThreshold){
-    right = true;
-  } else if(diff < -swipeThreshold){
-    left = true;
-  }
+  const swipeThreshold = 30;
+  if(diff > swipeThreshold) right = true;
+  else if(diff < -swipeThreshold) left = true;
   touchStartX = null;
 });
 
-// Level functions
+// Update lanes based on canvas size
+function updateLaneCenters() {
+  const actualWidth = canvas.clientWidth;
+  const margin = 20 * (actualWidth / 400); 
+  const roadWidth = actualWidth - 2 * margin;
+  const laneWidth = roadWidth / LANE_COUNT;
+  LANES = [];
+  for(let i=0;i<LANE_COUNT;i++){
+    LANES.push(margin + i*laneWidth + laneWidth/2);
+  }
+}
+
+// Call initially and on resize
+updateLaneCenters();
+window.addEventListener('resize', updateLaneCenters);
+
+// Start level
 function startLevel(lvl){
   level = lvl;
   const data = levelData[lvl-1];
@@ -163,7 +177,7 @@ function startLevel(lvl){
   frame = 0;
   gameOver = false;
 
-  levelDuration = 30; // 30s per level
+  levelDuration = 30;
   levelTime = 0;
 
   player.lane = 1;
@@ -209,10 +223,10 @@ function checkCollision(a,b){
          a.y + a.height > b.y;
 }
 
+// Game update
 function update() {
   if(gameOver) return;
 
-  // Lane movement
   if(left) { player.lane = Math.max(0, player.lane-1); left=false; }
   if(right) { player.lane = Math.min(LANE_COUNT-1, player.lane+1); right=false; }
   player.x = LANES[player.lane] - player.width/2;
@@ -224,7 +238,6 @@ function update() {
   if(frame % Math.floor(spawnRate) === 0) spawnObstacle();
   updateObstacles();
 
-  // Collision
   for(const obs of obstacles){
     if(checkCollision(player, obs)){
       gameOver=true;
@@ -235,7 +248,6 @@ function update() {
     }
   }
 
-  // Level timer
   levelTime = (Date.now()-startTime)/1000;
   if(levelTime >= levelDuration){
     gameOver = true;
@@ -245,22 +257,21 @@ function update() {
   }
 }
 
+// Draw functions
 function drawBackground(){
   ctx.fillStyle="#555";
   ctx.fillRect(0,0,canvas.width,canvas.height);
 
-  // Draw road borders
   ctx.fillStyle="#222";
   ctx.fillRect(0,0,20,canvas.height);
   ctx.fillRect(canvas.width-20,0,20,canvas.height);
 
-  // Draw lane dividers
   ctx.strokeStyle="#eee";
   ctx.lineWidth=4;
   ctx.setLineDash([20,20]);
   ctx.lineDashOffset=-lineOffset;
   for(let i=1; i<LANE_COUNT; i++){
-    const x = 20 + i*LANE_WIDTH;
+    const x = 20 + i*((canvas.width-40)/LANE_COUNT);
     ctx.beginPath();
     ctx.moveTo(x,0);
     ctx.lineTo(x,canvas.height);
@@ -290,6 +301,7 @@ function drawHUD(){
   }
 }
 
+// Game loop
 function gameLoop(){
   if(canvas.style.display === "block"){
     ctx.clearRect(0,0,canvas.width,canvas.height);
