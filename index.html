@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Scrolling Path Game - Taller Obstacles</title>
+<title>Scrolling Path Game - Images for Player & Obstacles</title>
 <style>
 body {
   margin: 0;
@@ -66,8 +66,13 @@ const gameOverText = document.getElementById("gameOverText");
 const levelSelectDiv = document.getElementById("levelSelect");
 const levelButtonsDiv = document.getElementById("levelButtons");
 
-// Player
-const player = { x:0, y:0, size:30, speed:6 };
+// Player image and size
+const PLAYER_WIDTH = 40;
+const PLAYER_HEIGHT = 80;
+const playerImg = new Image();
+playerImg.src = './car2.png'; // <-- Your player image path
+
+const player = { x:0, y:0, width:PLAYER_WIDTH, height:PLAYER_HEIGHT, speed:6 };
 
 // Game state
 let bgSpeed, lineOffset, obstacles, frame, gameOver;
@@ -78,17 +83,15 @@ let startTime, levelTime, levelDuration;
 // Level
 let level = 1;
 
-// Obstacle
+// Obstacle image and size
 const OBSTACLE_WIDTH = 40;
-const OBSTACLE_HEIGHT = 80; // Taller than wide
+const OBSTACLE_HEIGHT = 80;
+const obstacleImg = new Image();
+obstacleImg.src = './car2.png'; // <-- Your obstacle image path
 let obstacleSpeed, spawnRate;
 
 // Controls
 let left=false, right=false;
-
-// Load obstacle image
-const obstacleImg = new Image();
-obstacleImg.src = './car2.png'; // Replace with your image
 
 // Mock level data for 15 levels
 const levelData = [];
@@ -127,7 +130,7 @@ function startLevel(lvl){
   levelDuration = 30; // 30s per level
   levelTime = 0;
 
-  player.x = canvas.width/2 - player.size/2;
+  player.x = canvas.width/2 - player.width/2;
   player.y = canvas.height-100;
 
   startTime = Date.now();
@@ -147,7 +150,7 @@ function resetGame(){
   startLevel(level);
 }
 
-// Spawn taller obstacles
+// Spawn obstacles
 function spawnObstacle() {
   const x = 20 + Math.random()*(canvas.width - 40 - OBSTACLE_WIDTH);
   obstacles.push({x, y:-OBSTACLE_HEIGHT, width: OBSTACLE_WIDTH, height: OBSTACLE_HEIGHT});
@@ -160,12 +163,12 @@ function updateObstacles() {
   }
 }
 
-// Check collision for rectangles
+// Collision detection
 function checkCollision(a,b){
   return a.x < b.x + b.width &&
-         a.x + a.size > b.x &&
+         a.x + a.width > b.x &&
          a.y < b.y + b.height &&
-         a.y + a.size > b.y;
+         a.y + a.height > b.y;
 }
 
 function update() {
@@ -173,7 +176,7 @@ function update() {
 
   if(left) player.x -= player.speed;
   if(right) player.x += player.speed;
-  player.x = Math.max(20, Math.min(canvas.width - player.size - 20, player.x));
+  player.x = Math.max(20, Math.min(canvas.width - player.width - 20, player.x));
 
   lineOffset += bgSpeed;
   if(lineOffset>40) lineOffset=0;
@@ -229,8 +232,7 @@ function drawObstacles(){
 }
 
 function drawPlayer(){
-  ctx.fillStyle="#00ffcc";
-  ctx.fillRect(player.x,player.y,player.size,player.size);
+  ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
 }
 
 function drawHUD(){
